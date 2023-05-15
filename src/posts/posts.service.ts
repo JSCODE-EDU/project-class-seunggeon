@@ -1,9 +1,9 @@
-import { Injectable  } from '@nestjs/common';
+import { Injectable, NotFoundException  } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import { Posts } from '../../models/entities/Posts';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
-import { Repository } from 'typeorm';
+import { Repository, UpdateResult } from 'typeorm';
 
 @Injectable()
 export class PostsService {
@@ -13,7 +13,13 @@ export class PostsService {
   ) {}
 
   async findAll(): Promise<Posts[]> {
-    const posts = await this.postsRepository.find();
+    const posts = await this.postsRepository
+    .find({
+      order: {
+        createdAt: 'DESC'
+      },
+      take : 100
+    });
     return posts;
   }
 
@@ -21,26 +27,53 @@ export class PostsService {
     const post = await this.postsRepository.findOne({
       where : { postId }
     });
+    if (!post) {
+      throw new NotFoundException(`Post with id ${postId} not found.`);
+    }
     return post;
   }
-
-  async create(createPostDto: CreatePostDto): Promise<Posts> {
+  
+  async createPost(createPostDto: CreatePostDto): Promise<Posts> {
     const newPost = this.postsRepository.create(createPostDto);
-    await this.postsRepository.save(newPost);
-    return newPost;
+    try {
+      await this.postsRepository.save(newPost);
+      return newPost;
+    } catch (error) {
+      throw new NotFoundException('Failed to create post');
+    }
   }
 
-  async update(postId: number, updatePostDto: UpdatePostDto): Promise<Posts> {
-    const updatePost = this.postsRepository.create(updatePostDto);
-    await this.postsRepository.update(
-      postId, updatePost
+  async updatePost(
+    postId: number,
+    updatePostDto: UpdatePostDto
+  ): Promise<Posts> {
+    const updateResult: UpdateResult = await this.postsRepository.update(
+      postId,
+      updatePostDto
     );
-    return updatePost;
+    if (updateResult.affected === 0) {
+      throw new NotFoundException(`Post with ID ${postId} not found`);
+    }
+    const updatedPost: Posts = await this.postsRepository.findOne({
+      where : { postId }
+    });
+    return updatedPost;
   }
 
   async remove(postId: number): Promise<void> {
     await this.postsRepository.delete(
       postId
     );
+  }
+
+  async searchById(word: string): Promise<Posts[]> {
+    return await this.postsRepository
+    .createQueryBuilder('posts')
+    .where('posts.title LIKE :query', {
+      query: `%${word}%`
+    })
+    .take(100) // 최대 100개까지 조회
+    .orderBy('posts.createdAt', 'DESC')
+    .getMany();
   }
 }
