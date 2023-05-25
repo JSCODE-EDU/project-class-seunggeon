@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Posts } from '../../models/entities/Posts';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { SearchPostDto } from './dto/search-post.dto';
 import { Repository, UpdateResult } from 'typeorm';
 
 @Injectable()
@@ -61,16 +62,20 @@ export class PostsService {
   }
 
   async remove(postId: number): Promise<void> {
+    const post = await this.findOne(postId);
+    if (!post) {
+      throw new NotFoundException(`Post ${postId} not found`);
+    }
     await this.postsRepository.delete(
       postId
     );
   }
 
-  async searchById(word: string): Promise<Posts[]> {
+  async searchById(keyword: SearchPostDto): Promise<Posts[]> {
     return await this.postsRepository
     .createQueryBuilder('posts')
     .where('posts.title LIKE :query', {
-      query: `%${word}%`
+      query: `%${keyword}%`
     })
     .take(100) // 최대 100개까지 조회
     .orderBy('posts.createdAt', 'DESC')
