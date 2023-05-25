@@ -16,9 +16,8 @@ async function bootstrap() {
     .build();
   
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document); // end-point path
   app.use('/docs', express.static(path.join(__dirname, 'swagger-ui')));
-  app.use('/docs', express.static('public/swagger-ui'));
   app.use('/docs/swagger.json', (req, res) => {
     res.json(document);
   });
